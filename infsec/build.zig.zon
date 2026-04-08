@@ -1,0 +1,7 @@
+.{
+    .name = .infsec,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.15.2",
+    .paths = .{""},
+    .fingerprint = 0x3cf0e7cb3f3b49c7,
+}

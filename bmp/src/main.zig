@@ -8,7 +8,8 @@ const Pixel = packed struct {
 
 const BitMapFileHeader = packed struct {
     bfType: u16,
-    bfSize: u32, bfReserved1: u16,
+    bfSize: u32,
+    bfReserved1: u16,
     bfReserved2: u16,
     bfOffBits: u32,
 };
@@ -33,25 +34,40 @@ const BmpImage = struct {
     data: []Pixel,
     allocator: std.mem.Allocator,
 
+    pub fn clone(self: BmpImage) !BmpImage {
+        var res: BmpImage = undefined;
+        res.fh = self.fh;
+        res.ih = self.ih;
+        res.allocator = self.allocator;
+        res.data = try self.allocator.dupe(Pixel, self.data);
+        return res;
+    }
+
     pub fn init(path: []const u8, allocator: std.mem.Allocator) !BmpImage {
         const f = try std.fs.cwd().openFile(path, .{});
         defer f.close();
         var buf: [1024]u8 = undefined;
-        var r = f.reader(&buf); 
+        var r = f.reader(&buf);
         const ior = &r.interface;
+
         var res: BmpImage = undefined;
-        res.fh = try ior.takeStruct(BitMapFileHeader,  .little);
+        res.fh = try ior.takeStruct(BitMapFileHeader, .little);
         res.ih = try ior.takeStruct(BitMapInfoHeader, .little);
         res.allocator = allocator;
-        const padding = (4-((3*res.ih.biWidth)%4))%4;
-        const num_of_pixels = res.ih.biWidth*res.ih.biHeight;
+
+        const w: u32 = @intCast(res.ih.biWidth);
+        const h: u32 = @intCast(res.ih.biHeight);
+
+        const padding = 4 - ((3 * w) % 4) % 4;
+        const num_of_pixels: usize = @intCast(w * h);
         res.data = try allocator.alloc(Pixel, num_of_pixels);
+
         try r.seekTo(res.fh.bfOffBits);
         var idx: usize = 0;
-        for (0..res.ih.biHeight) |_|{
-            for (0..res.ih.biWidth) |_|{
-                res.data[idx] = ior.takeStruct(Pixel, .little); 
-                idx+=1; 
+        for (0..h) |_| {
+            for (0..w) |_| {
+                res.data[idx] = try ior.takeStruct(Pixel, .little);
+                idx += 1;
             }
             try f.seekBy(padding);
         }
@@ -64,19 +80,16 @@ const BmpImage = struct {
     }
 
     pub fn debugLogHeaders(self: BmpImage) void {
-        std.debug.print("Тип:              {x}\n",      .{self.fh.bfType});
+        std.debug.print("Тип:              {x}\n", .{self.fh.bfType});
         std.debug.print("Размер заголовка: {d} байт\n", .{self.fh.bfSize});
-        std.debug.print("рез1:             {d}\n",      .{self.fh.bfReserved1});
-        std.debug.print("рез2:             {d}\n",      .{self.fh.bfReserved2});
-        std.debug.print("Смещение:         {d}\n",      .{self.fh.bfOffBits});
-        std.debug.print("размер:           {d}:{d}\n",  .{self.ih.biWidth,
-                                                          self.ih.biHeight});
-        std.debug.print("размер заголовка: {d}\n",      .{self.ih.biSize});
-        std.debug.print("биты:             {d}\n",      .{self.ih.biBitCount});
-        
+        std.debug.print("рез1:             {d}\n", .{self.fh.bfReserved1});
+        std.debug.print("рез2:             {d}\n", .{self.fh.bfReserved2});
+        std.debug.print("Смещение:         {d}\n", .{self.fh.bfOffBits});
+        std.debug.print("размер:           {d}:{d}\n", .{ self.ih.biWidth, self.ih.biHeight });
+        std.debug.print("размер заголовка: {d}\n", .{self.ih.biSize});
+        std.debug.print("биты:             {d}\n", .{self.ih.biBitCount});
     }
 };
-
 
 pub fn main() !void {
     var gpa = std.heap.DebugAllocator(.{}){};
@@ -85,6 +98,11 @@ pub fn main() !void {
     };
     const allocator = gpa.allocator();
     const bmp = try BmpImage.init("image.bmp", allocator);
-    bmp.debugLogHeaders(); 
+    bmp.debugLogHeaders();
+
+    const img2: BmpImage = try bmp.clone();
+    img2.debugLogHeaders();
+    defer img2.deinit();
+
     defer bmp.deinit();
 }
