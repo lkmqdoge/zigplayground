@@ -1,9 +1,9 @@
 const std = @import("std");
 
 const Pixel = packed struct {
-    blue: u8,
-    green: u8,
-    red: u8,
+    blue: u8 = 0,
+    green: u8 = 0,
+    red: u8 = 0,
 };
 
 const BitMapFileHeader = packed struct {
@@ -33,15 +33,6 @@ const BmpImage = struct {
     ih: BitMapInfoHeader,
     data: []Pixel,
     allocator: std.mem.Allocator,
-
-    pub fn clone(self: BmpImage) !BmpImage {
-        var res: BmpImage = undefined;
-        res.fh = self.fh;
-        res.ih = self.ih;
-        res.allocator = self.allocator;
-        res.data = try self.allocator.dupe(Pixel, self.data);
-        return res;
-    }
 
     pub fn init(path: []const u8, allocator: std.mem.Allocator) !BmpImage {
         const f = try std.fs.cwd().openFile(path, .{});
@@ -75,11 +66,68 @@ const BmpImage = struct {
         return res;
     }
 
-    pub fn deinit(self: BmpImage) void {
+    pub fn deinit(self: *BmpImage) void {
         self.allocator.free(self.data);
     }
 
-    pub fn debugLogHeaders(self: BmpImage) void {
+    pub fn clone(self: *BmpImage) !BmpImage {
+        var res: BmpImage = undefined;
+        res.fh = self.fh;
+        res.ih = self.ih;
+        res.allocator = self.allocator;
+        res.data = try self.allocator.dupe(Pixel, self.data);
+        return res;
+    }
+
+    pub fn cloneEmpty(self: *BmpImage) !BmpImage {
+        var res: BmpImage = undefined;
+        res.fh = self.fh;
+        res.ih = self.ih;
+        res.allocator = self.allocator;
+        res.data = try self.allocator.alloc(Pixel, self.data.len);
+        return res;
+    }
+
+    pub fn writeToDisk(self: *BmpImage, path: []const u8) !void {
+        const f = try std.fs.cwd().createFile(path, .{});
+        defer f.close();
+        var buf: [1024]u8 = undefined;
+        var writer = f.writer(&buf);
+        const iw = &writer.interface;
+
+        const w: u32 = @intCast(self.ih.biWidth);
+        const h: u32 = @intCast(self.ih.biHeight);
+
+        try iw.writeStruct(self.fh, .little);
+        try iw.writeStruct(self.ih, .little);
+        const padding = 4 - ((3 * w) % 4) % 4;
+
+        var idx: usize = 0;
+        for (0..h) |_| {
+            for (0..w) |_| {
+                try iw.writeStruct(self.data[idx], .little);
+                idx += 1;
+            }
+            const zero: [3]u8 = .{0, 0, 0};
+            try iw.writeAll(zero[0..padding]);
+        }
+    }
+
+    pub fn takeChannels(self: *BmpImage) !struct {BmpImage, BmpImage, BmpImage} {
+        var b = try self.cloneEmpty();
+        var g = try self.cloneEmpty();
+        var r = try self.cloneEmpty();
+        
+        for (0..self.data.len) |i| {
+            b.data[i] = .{ .blue = self.data[i].blue }; 
+            g.data[i] = .{ .green = self.data[i].green };
+            r.data[i] = .{ .red = self.data[i].red };
+        }
+
+        return .{ b, g, r };
+    }
+
+    pub fn debugLogHeaders(self: *BmpImage) void {
         std.debug.print("Тип:              {x}\n", .{self.fh.bfType});
         std.debug.print("Размер заголовка: {d} байт\n", .{self.fh.bfSize});
         std.debug.print("рез1:             {d}\n", .{self.fh.bfReserved1});
@@ -97,12 +145,15 @@ pub fn main() !void {
         std.log.err("Memory leak", .{});
     };
     const allocator = gpa.allocator();
-    const bmp = try BmpImage.init("image.bmp", allocator);
+    var bmp = try BmpImage.init("image.bmp", allocator);
     bmp.debugLogHeaders();
+    var channels = try bmp.takeChannels();
+    defer inline for (&channels)|*c| {
+        c.deinit(); 
+    };
 
-    const img2: BmpImage = try bmp.clone();
-    img2.debugLogHeaders();
-    defer img2.deinit();
-
+    try channels.@"0".writeToDisk("BLUE.bmp");
+    try channels.@"1".writeToDisk("GREEN.bmp");
+    try channels.@"2".writeToDisk("RED.bmp");
     defer bmp.deinit();
 }

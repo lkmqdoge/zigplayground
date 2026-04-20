@@ -47,6 +47,15 @@ const AccessMatrix = struct {
         self.resources.deinit(self.allocator);
     }
 
+    pub fn login(self: *AccessMatrix, username: []const u8) i32 {
+        for (self.users.items, 0..)|*user, i| {
+            if (std.mem.eql(u8, user.name, username)) {
+                return @intCast(i);
+            }
+        }
+        return -1;
+    }
+
     pub fn addUser(self: *AccessMatrix, name:[]const u8) !void {
         const user:User = .{
             .name = name,
@@ -102,5 +111,35 @@ pub fn main() !void {
     try am.addResource(.{.path = "res_3"});
     try am.addResource(.{.path = "res_4"});
 
-    am.debugPrintAccessMatrix();
+    var buf: [1024]u8 = undefined;
+    var stdin = std.fs.File.stdin().reader(&buf);
+    var ior = &stdin.interface;
+    var current_user_id: i32 = -1;
+
+    try std.fs.File.stdout().writeAll("login: ");
+    var user_input = try ior.takeDelimiterInclusive('\n');
+
+    current_user_id = am.login(user_input[0 .. user_input.len - 1]);
+    if (current_user_id < 0) return;
+
+    const Commands = enum {
+        q,
+        grant,
+        write,
+        read,
+        table,
+    };
+    menu: while (true) {
+        try std.fs.File.stdout().writeAll(am.users.items[@intCast(current_user_id)].name);
+        user_input = try ior.takeDelimiterInclusive('\n');
+        const input = std.meta.stringToEnum(Commands, user_input[0 .. user_input.len - 1]) orelse {
+            std.debug.print("Unknown command\n", .{});
+            return;
+        };
+        switch (input) {
+            .table => am.debugPrintAccessMatrix(),
+            .q => break :menu,
+            else => try std.fs.File.stdout().writeAll("Invalid Input\n"),
+        }
+    }
 }
