@@ -1,0 +1,7 @@
+.{
+    .name = .zzip,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.15.2",
+    .paths = .{""},
+    .fingerprint = 0x989ad3b04f24d229,
+}
