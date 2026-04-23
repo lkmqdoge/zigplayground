@@ -1,10 +1,16 @@
 const std = @import("std");
 
 
+const AccessError = error {
+    UserNotExist,
+    ResourceNotExist,
+};
+
 const AccessMatrix = struct {
     users:      std.ArrayList(User),
     resources:  std.ArrayList(Resource),
     allocator:  std.mem.Allocator,
+
 
     const Permission = struct {
         pub const forbidden:   u8 = 0;
@@ -48,26 +54,26 @@ const AccessMatrix = struct {
     }
 
 
-    pub fn findUser(self: *AccessMatrix, username: []const u8) i32 {
+    pub fn findUser(self: *AccessMatrix, username: []const u8) !u32 {
         for (self.users.items, 0..)|*user, i| {
             if (std.mem.eql(u8, user.name, username)) {
                 return @intCast(i);
             }
         }
-        return -1;
+        return error.UserNotExist;
     }
 
-    pub fn findResource(self: *AccessMatrix, username: []const u8) i32 {
-        for (self.users.items, 0..)|*user, i| {
-            if (std.mem.eql(u8, user.name, username)) {
+    pub fn findResource(self: *AccessMatrix, resname: []const u8) !u32 {
+        for (self.resources.items, 0..)|*res, i| {
+            if (std.mem.eql(u8, res.path, resname)) {
                 return @intCast(i);
             }
         }
-        return -1;
+        return error.ResourceNotExist;
     }
 
-    pub fn login(self: *AccessMatrix, username: []const u8) i32 {
-        return self.findUser(username);
+    pub fn login(self: *AccessMatrix, username: []const u8) !u32 {
+        return try self.findUser(username);
     }
 
     pub fn addUser(self: *AccessMatrix, name:[]const u8) !void {
@@ -104,8 +110,8 @@ const AccessMatrix = struct {
 
     const respath = "res/";
     pub fn readResource(self: *AccessMatrix, user_id: u32, res_id: u32) !void {
-        if (!self.checkPermissions(user_id, res_id, Permission.grant)) {
-            std.debug.print("User {s} has no read permission", .{self.users.items[user_id].name});
+        if (!self.checkPermissions(user_id, res_id, Permission.read)) {
+            std.debug.print("User {s} has no read permission\n", .{self.users.items[user_id].name});
             return;
         }
         var strbuf: [64]u8 = undefined;
@@ -116,18 +122,19 @@ const AccessMatrix = struct {
     }
 
     pub fn writeResource(self: *AccessMatrix, user_id: u32, res_id: u32, content: []const u8) !void {
-        if (!self.checkPermissions(user_id, res_id, Permission.grant)) {
-            std.debug.print("User {s} has no write permission", .{self.users.items[user_id].name});
+        if (!self.checkPermissions(user_id, res_id, Permission.write)) {
+            std.debug.print("User {s} has no write permission\n", .{self.users.items[user_id].name});
             return;
         }
-        var strbuf: [32]u8 = undefined;
+        var strbuf: [64]u8 = undefined;
         const path = try std.fmt.bufPrint(&strbuf,"{s}{s}", .{respath, self.resources.items[res_id].path});
         var buf: [4096]u8 = undefined;
-        const f = try std.fs.cwd().openFile(path, .{});
+        const f = try std.fs.cwd().openFile(path, .{.mode = .write_only});
         defer f.close();
         var writer = f.writer(&buf);
         const iow = &writer.interface;
         try iow.writeAll(content);
+        try iow.flush();
     }
 
     pub fn grantToUser(self: *AccessMatrix, user_id: u32, user_id_dst: u32, res_id: u32, p: u8) !void {
@@ -135,13 +142,14 @@ const AccessMatrix = struct {
             std.debug.print("User {s} has no grant permission", .{self.users.items[user_id].name});
             return;
         }
-
-        const new_p = self.users.items[user_id_dst].permissions.get(res_id).? & p;
-        try self.users.items[user_id_dst].permissions.put(res_id, new_p);
+        const old = self.users.items[user_id_dst].permissions.get(res_id) orelse 0;
+        try self.users.items[user_id_dst].permissions.put(res_id, old | p);
     }
 
     fn checkPermissions(self: *AccessMatrix, user_id: u32, res_id: u32, p: u8) bool {
-        return (self.users.items[user_id].permissions.get(res_id).? & p) != 0;
+        const user = &self.users.items[user_id];
+        const user_p = user.permissions.get(res_id) orelse 0;
+        return (user_p & p) != 0;
     }
 };
 
@@ -170,12 +178,13 @@ pub fn main() !void {
     var buf: [1024]u8 = undefined;
     var stdin = std.fs.File.stdin().reader(&buf);
     var ior = &stdin.interface;
-    var current_user_id: i32 = -1;
 
     try std.fs.File.stdout().writeAll("login: ");
     var user_input = try ior.takeDelimiterInclusive('\n');
-    current_user_id = am.login(user_input[0 .. user_input.len - 1]);
-    if (current_user_id < 0) return;
+    var current_user_id = am.login(user_input[0 .. user_input.len - 1]) catch {
+        std.debug.print("User doesnt exist", .{});
+        return;
+    };
 
     const Commands = enum {
         q,
@@ -202,55 +211,51 @@ pub fn main() !void {
             .login => {
                 try std.fs.File.stdout().writeAll("login: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
-                const new_user_id = am.login(user_input[0 .. user_input.len - 1]);
-                if (current_user_id < 0) {
-                    std.debug.print("user not exist", .{});
+                const new_user_id = am.login(user_input[0 .. user_input.len - 1]) catch {
+                    std.debug.print("user not exist\n", .{});
                     continue;
-                }
+                };
                 current_user_id = new_user_id;
             },
             .read => {
                 try std.fs.File.stdout().writeAll("resource name: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
-                const res_id = am.findResource(user_input[0 .. user_input.len - 1]);
-                if (res_id < 0) {
-                    std.debug.print("file not exist", .{});
+                const res_id = am.findResource(user_input[0 .. user_input.len - 1]) catch {
+                    std.debug.print("file not exist\n", .{});
                     continue;
-                }
-
-                try am.readResource(@intCast(current_user_id),
-                    @intCast(res_id));
+                };
+                try am.readResource(current_user_id, res_id);
             },
             .write => {
                 try std.fs.File.stdout().writeAll("resource name: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
-                const res_id = am.findResource(user_input[0 .. user_input.len - 1]);
-                if (res_id < 0) {
-                    std.debug.print("file not exist", .{});
+                const res_id = am.findResource(user_input[0 .. user_input.len - 1]) catch {
+                    std.debug.print("file not exist\n", .{});
                     continue;
-                }
-                try std.fs.File.stdout().writeAll("resource name: ");
+                };
+
+                try std.fs.File.stdout().writeAll("Text to write: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
-                try am.writeResource(
-                    @intCast(current_user_id),
-                    @intCast(res_id), user_input);
+                try am.writeResource( current_user_id, res_id, user_input);
             },
             .grant => {
                 try std.fs.File.stdout().writeAll("grant to user: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
-                const to_user = am.findUser(user_input[0 .. user_input.len - 1]);
-                if (to_user < 0) {
-                    std.debug.print("user not exist", .{});
+                const to_user = am.findUser(user_input[0 .. user_input.len - 1]) catch {
+                    std.debug.print("user not exist\n", .{});
                     continue;
-                }
+                };
 
-                const res_id = am.findUser(user_input[0 .. user_input.len - 1]);
-                if (to_user < 0) {
-                    std.debug.print("resource not exist", .{});
-                    continue;
-                }
-
+                try std.fs.File.stdout().writeAll("resource: ");
                 user_input = try ior.takeDelimiterInclusive('\n');
+                const res_id = am.findResource(user_input[0 .. user_input.len - 1]) catch {
+                    std.debug.print("resource not exist\n", .{});
+                    continue;
+                };
+
+                try std.fs.File.stdout().writeAll("permission: ");
+                user_input = try ior.takeDelimiterInclusive('\n');
+
                 const perms = enum {grant, write, read};
                 const perm_input = std.meta.stringToEnum(perms, user_input[0 .. user_input.len - 1]) orelse {
                     std.debug.print("Unknown command\n", .{});
@@ -261,11 +266,7 @@ pub fn main() !void {
                     .write => AccessMatrix.Permission.write,
                     .read => AccessMatrix.Permission.read,
                 };
-                try am.grantToUser(
-                    @intCast(current_user_id),
-                    @intCast(to_user),
-                    @intCast(res_id),
-                    perm);
+                try am.grantToUser( current_user_id, to_user, res_id, perm);
             },
             .table => am.debugPrintAccessMatrix(),
             .q => break :menu,
