@@ -23,6 +23,18 @@ pub fn main() !void {
     defer image.deinit();
     image.debugLogHeaders();
 
+    var g = try image.grayScale();
+    defer g.deinit();
+    try g.writeToDisk("GRAY.bmp");
+
+    for (0..8) |bit| {
+        var p = try g.BitPlane(@intCast(bit));
+        defer p.deinit();
+        var buf: [32]u8 = undefined;
+        const s = try std.fmt.bufPrint(&buf, "BITPLANE_{d}.bmp", .{bit});
+        try p.writeToDisk(s);
+    }
+
     // var channels = try bmp.takeChannels();
     // defer inline for (&channels)|*c| {
     //     c.deinit(); 

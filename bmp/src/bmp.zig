@@ -127,6 +127,37 @@ pub const BmpImage = struct {
         return .{ b, g, r };
     }
 
+    pub fn BitPlane(self: *BmpImage, bit: u3) !BmpImage {
+        var res = try self.cloneEmpty();
+        for (0..self.data.len) |i| {
+            const one: u8 = 1;
+            res.data[i] = .{
+                .blue = (one << bit) & self.data[i].blue,
+                .green = (one << bit) & self.data[i].green,
+                .red = (one << bit) & self.data[i].red,
+            };
+        }
+        return res;
+    }
+
+    pub fn grayScale(self: *BmpImage) !BmpImage {
+        var res = try self.cloneEmpty();
+        for (0..self.data.len) |i| {
+            var sum: u32 = 0;
+            sum += self.data[i].blue;
+            sum += self.data[i].green;
+            sum += self.data[i].red;
+            const average: u8 = @intCast(sum / 3);
+            res.data[i] = .{
+                .blue = average,
+                .green = average,
+                .red = average,
+            };
+        }
+
+        return res;
+    }
+
     pub fn debugLogHeaders(self: *BmpImage) void {
         std.debug.print("Тип:              {x}\n", .{self.fh.bfType});
         std.debug.print("Размер заголовка: {d} байт\n", .{self.fh.bfSize});
