@@ -199,7 +199,7 @@ pub const Vector2 = extern struct {
     }
 
     /// Check whether two given vectors are almost equal
-    pub fn equals(self: Vector2, q: Vector2) i32 {
+    pub fn equals(self: Vector2, q: Vector2) bool {
         return math.vector2Equals(self, q);
     }
 
@@ -416,7 +416,7 @@ pub const Vector3 = extern struct {
     }
 
     /// Check whether two given vectors are almost equal
-    pub fn equals(p: Vector3, q: Vector3) i32 {
+    pub fn equals(p: Vector3, q: Vector3) bool {
         return math.vector3Equals(p, q);
     }
 
@@ -550,13 +550,92 @@ pub const Vector4 = extern struct {
     }
 
     /// Check whether two given quaternions are almost equal
-    pub fn equals(p: Vector4, q: Vector4) i32 {
+    pub fn equals(p: Vector4, q: Vector4) bool {
         return math.vector4Equals(p, q);
+    }
+};
+
+pub const Quaternion = extern struct {
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+
+    pub fn init(x: f32, y: f32, z: f32, w: f32) Quaternion {
+        return Quaternion{ .x = x, .y = y, .z = z, .w = w };
+    }
+
+    pub fn initVec(vec: @Vector(4, f32)) Quaternion {
+        return Quaternion{ .x = vec[0], .y = vec[1], .z = vec[2], .w = vec[2] };
+    }
+
+    pub fn initVector4(vec: Vector4) Quaternion {
+        return Quaternion{ .x = vec.x, .y = vec.y, .z = vec.z, .w = vec.w };
     }
 
     /// Get identity quaternion
     pub fn identity() Quaternion {
         return math.quaternionIdentity();
+    }
+
+    /// Add two quaternions
+    pub fn add(self: Quaternion, q: Quaternion) Quaternion {
+        return math.quaternionAdd(self, q);
+    }
+
+    /// Add quaternion and float value
+    pub fn addValue(self: Quaternion, add_: f32) Quaternion {
+        return math.quaternionAddValue(self, add_);
+    }
+
+    /// Subtract two quaternions
+    pub fn subtract(self: Quaternion, q: Quaternion) Quaternion {
+        return math.quaternionSubtract(self, q);
+    }
+
+    /// Subtract quaternion and float value
+    pub fn subtractValue(self: Quaternion, add_: f32) Quaternion {
+        return math.quaternionSubtractValue(self, add_);
+    }
+
+    /// Computes the length of a quaternion
+    pub fn length(self: Quaternion) f32 {
+        return math.quaternionLength(self);
+    }
+
+    /// Scale quaternion by float value
+    pub fn scale(self: Quaternion, scale_: f32) Quaternion {
+        return math.quaternionScale(self, scale_);
+    }
+
+    /// Multiply quaternion by quaternion
+    pub fn multiply(self: Quaternion, q: Quaternion) Quaternion {
+        return math.quaternionMultiply(self, q);
+    }
+
+    /// Divide two quaternions
+    pub fn divide(self: Quaternion, q: Quaternion) Quaternion {
+        return math.quaternionDivide(self, q);
+    }
+
+    /// Normalize quaternion
+    pub fn normalize(self: Quaternion) Quaternion {
+        return math.quaternionNormalize(self);
+    }
+
+    /// Calculate linear interpolation between two quaternions
+    pub fn lerp(self: Quaternion, q: Quaternion, amount: f32) Quaternion {
+        return math.quaternionLerp(self, q, amount);
+    }
+
+    /// Invert provided quaternion
+    pub fn invert(self: Quaternion) Quaternion {
+        return math.quaternionInvert(self);
+    }
+
+    /// Check whether two given quaternions are almost equal
+    pub fn equals(p: Quaternion, q: Quaternion) bool {
+        return math.quaternionEquals(p, q);
     }
 
     /// Calculate slerp-optimized interpolation between two quaternions
@@ -618,7 +697,6 @@ pub const Vector4 = extern struct {
         return math.quaternionTransform(self, mat);
     }
 };
-pub const Quaternion = Vector4;
 
 pub const Matrix = extern struct {
     m0: f32,
@@ -3723,6 +3801,16 @@ pub fn drawCircle(centerX: i32, centerY: i32, radius: f32, color: Color) void {
     cdef.DrawCircle(@as(c_int, centerX), @as(c_int, centerY), radius, color);
 }
 
+/// Draw a color-filled circle (Vector version)
+pub fn drawCircleV(center: Vector2, radius: f32, color: Color) void {
+    cdef.DrawCircleV(center, radius, color);
+}
+
+/// Draw a gradient-filled circle
+pub fn drawCircleGradient(center: Vector2, radius: f32, inner: Color, outer: Color) void {
+    cdef.DrawCircleGradient(center, radius, inner, outer);
+}
+
 /// Draw a piece of a circle
 pub fn drawCircleSector(center: Vector2, radius: f32, startAngle: f32, endAngle: f32, segments: i32, color: Color) void {
     cdef.DrawCircleSector(center, radius, startAngle, endAngle, @as(c_int, segments), color);
@@ -3731,16 +3819,6 @@ pub fn drawCircleSector(center: Vector2, radius: f32, startAngle: f32, endAngle:
 /// Draw circle sector outline
 pub fn drawCircleSectorLines(center: Vector2, radius: f32, startAngle: f32, endAngle: f32, segments: i32, color: Color) void {
     cdef.DrawCircleSectorLines(center, radius, startAngle, endAngle, @as(c_int, segments), color);
-}
-
-/// Draw a gradient-filled circle
-pub fn drawCircleGradient(centerX: i32, centerY: i32, radius: f32, inner: Color, outer: Color) void {
-    cdef.DrawCircleGradient(@as(c_int, centerX), @as(c_int, centerY), radius, inner, outer);
-}
-
-/// Draw a color-filled circle (Vector version)
-pub fn drawCircleV(center: Vector2, radius: f32, color: Color) void {
-    cdef.DrawCircleV(center, radius, color);
 }
 
 /// Draw circle outline

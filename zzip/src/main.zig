@@ -1,22 +1,32 @@
 const std = @import("std");
 
 const PPM = struct {
-    
+    const PPMContext = struct { 
+        next: std.ArrayList([]const u8),
+        context: []const u8,
+        already_encountered: u32,
+    };
+
+    order: u32,
+
+    pub fn init(order: u32) PPM {
+        return .{
+            .order = order,
+        };
+    }
+
+    pub fn encodeByte(self: *PPM, context: []u8, byte: u8) void {
+    }
 };
 
 const HCoder = struct {
 
 };
 
-pub fn main() !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    const allocator = gpa.allocator();
-    defer if (gpa.deinit() == .leak) {
-        std.debug.print("Memory leak(\n", .{});
-    };
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     const test_string = "abracadabra";
-
     var map = std.StringHashMap(std.ArrayList([]const u8 )).init(allocator);
     defer {
         var it = map.iterator();

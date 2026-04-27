@@ -6,7 +6,7 @@
     //
     // It is redundant to include "zig" in this name because it is already
     // within the Zig package namespace.
-    .name = .foo,
+    .name = .keyboard,
     // This is a [Semantic Version](https://semver.org/).
     // In a future version of Zig it will be used for package deduplication.
     .version = "0.0.0",
@@ -22,10 +22,10 @@
     // original project's identity. Thus it is recommended to leave the comment
     // on the following line intact, so that it shows up in code reviews that
     // modify the field.
-    .fingerprint = 0x8c736521040d114f, // Changing this has security and trust implications.
+    .fingerprint = 0x83748095e4f751ac, // Changing this has security and trust implications.
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
-    .minimum_zig_version = "0.15.2",
+    .minimum_zig_version = "0.16.0",
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .raylib_zig = .{
-            .url = "git+https://github.com/raylib-zig/raylib-zig?ref=devel#e7fe21a041d811116c24d5e6e64b5602988ecb43",
-            .hash = "raylib_zig-5.6.0-dev-KE8REIRdBQCPwyTnASiqrgDiovsd7RngNDERrUk-kOAA",
+            .url = "git+https://github.com/raylib-zig/raylib-zig?ref=devel#47766db82f30aece1d72c935edc71bc33d268fd6",
+            .hash = "raylib_zig-6.0.0-KE8REL9kBQBRwC49KhXw7hPBn22d7UjDiOdpMInX0DLE",
         },
         .emsdk = .{
             .url = "git+https://github.com/emscripten-core/emsdk?ref=4.0.9#3bcf1dcd01f040f370e10fe673a092d9ed79ebb5",

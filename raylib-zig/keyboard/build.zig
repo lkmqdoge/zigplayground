@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) !void {
     const raylib_dep = b.dependency("raylib_zig", .{
         .target = target,
         .optimize = optimize,
+        .linkage = .dynamic,
     });
     const raylib = raylib_dep.module("raylib");
     const raylib_artifact = raylib_dep.artifact("raylib");
@@ -25,7 +26,7 @@ pub fn build(b: *std.Build) !void {
     if (target.query.os_tag == .emscripten) {
         const emsdk = rlz.emsdk;
         const wasm = b.addLibrary(.{
-            .name = "test",
+            .name = "keyboard",
             .root_module = exe_mod,
         });
 
@@ -37,7 +38,7 @@ pub fn build(b: *std.Build) !void {
             .optimize = optimize,
             .flags = emcc_flags,
             .settings = emcc_settings,
-            .shell_file_path = emsdk.shell(raylib_dep.builder),
+            .shell_file_path = emsdk.shell(raylib_dep),
             .install_dir = install_dir,
             .embed_paths = &.{.{ .src_path = "resources/" }},
         });
@@ -54,7 +55,7 @@ pub fn build(b: *std.Build) !void {
         run_step.dependOn(emrun_step);
     } else {
         const exe = b.addExecutable(.{
-            .name = "test",
+            .name = "keyboard",
             .root_module = exe_mod,
         });
         b.installArtifact(exe);
