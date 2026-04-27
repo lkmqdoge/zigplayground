@@ -34,11 +34,11 @@ pub const BmpImage = struct {
     data: []Pixel,
     allocator: std.mem.Allocator,
 
-    pub fn init(path: []const u8, allocator: std.mem.Allocator) !BmpImage {
-        const f = try std.fs.cwd().openFile(path, .{});
-        defer f.close();
+    pub fn init(io: std.Io,  allocator: std.mem.Allocator, path: []const u8) !BmpImage {
+        const f = try std.Io.Dir.cwd().openFile(io, path, .{});
+        defer f.close(io);
         var buf: [1024]u8 = undefined;
-        var r = f.reader(&buf);
+        var r = f.reader(io, &buf);
         const ior = &r.interface;
 
         var res: BmpImage = undefined;
@@ -88,11 +88,11 @@ pub const BmpImage = struct {
         return res;
     }
 
-    pub fn writeToDisk(self: *BmpImage, path: []const u8) !void {
-        const f = try std.fs.cwd().createFile(path, .{});
-        defer f.close();
+    pub fn writeToDisk(self: *BmpImage, io: std.Io, path: []const u8) !void {
+        const f = try std.Io.Dir.cwd().createFile(io, path, .{});
+        defer f.close(io);
         var buf: [1024]u8 = undefined;
-        var writer = f.writer(&buf);
+        var writer = f.writer(io, &buf);
         const iw = &writer.interface;
 
         const w: u32 = @intCast(self.ih.biWidth);

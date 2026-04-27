@@ -107,28 +107,29 @@ pub const MAC_AccessMatrix = struct {
         
         self.resources.items[to_user_id].access_level = new_access_level;
     }
-    pub fn readResource(self: *MAC_AccessMatrix, user_id: u32, res_id: u32) !void {
+    pub fn readResource(self: *MAC_AccessMatrix, io: std.Io, user_id: u32, res_id: u32) !void {
         if (!self.checkAccessLevel(user_id, res_id, .Read))
             return error.ReadAccessDenied; 
+
         const res = &self.resources.items[res_id];
         var strbuf: [128]u8 = undefined;
         const s = try std.fmt.bufPrint(&strbuf, "res/{s}", .{res.name});
         
         var buf: [1024]u8 = undefined;
-        std.debug.print("{s}\n", .{try std.fs.cwd().readFile(s, &buf)});
+        std.debug.print("{s}\n", .{ try std.Io.Dir.cwd().readFile(io, s, &buf)});
     }
 
-    pub fn writeResource(self: *MAC_AccessMatrix, user_id: u32, res_id: u32, content: []const u8) !void {
+    pub fn writeResource(self: *MAC_AccessMatrix, io: std.Io, user_id: u32, res_id: u32, content: []const u8) !void {
         if (!self.checkAccessLevel(user_id, res_id, .Write))
             return error.WriteAccessDenied; 
 
         const res = &self.resources.items[res_id];
         var strbuf: [128]u8 = undefined;
         const s = try std.fmt.bufPrint(&strbuf, "res/{s}", .{res.name});
-        var f = try std.fs.cwd().openFile(s, .{.mode = .write_only});
-        defer f.close();
+        var f = try std.Io.Dir.cwd().openFile(io, s, .{ .mode = .write_only });
+        defer f.close(io);
         var buf: [1024]u8 = undefined;
-        var writer = f.writer(&buf);
+        var writer = f.writer(io, &buf);
         const iow = &writer.interface;
         try iow.writeAll(content);
         try iow.flush();

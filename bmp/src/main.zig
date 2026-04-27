@@ -1,17 +1,12 @@
 const std = @import("std");
 const bmp = @import("bmp.zig");
 
-pub fn main() !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) {
-        std.log.err("Memory leak", .{});
-    };
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
 
-    const argv = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, argv);
-
-    if (argv.len == 1) {
+    if (args.len == 1) {
         std.debug.print(
         \\Usage:
         \\      bmp <filename>
@@ -19,20 +14,20 @@ pub fn main() !void {
         return;
     }
 
-    var image = try bmp.BmpImage.init("image.bmp", allocator);
+    var image = try bmp.BmpImage.init(io, allocator, "image.bmp");
     defer image.deinit();
     image.debugLogHeaders();
 
     var g = try image.grayScale();
     defer g.deinit();
-    try g.writeToDisk("GRAY.bmp");
+    try g.writeToDisk(io, "GRAY.bmp");
 
     for (0..8) |bit| {
         var p = try g.BitPlane(@intCast(bit));
         defer p.deinit();
         var buf: [32]u8 = undefined;
         const s = try std.fmt.bufPrint(&buf, "BITPLANE_{d}.bmp", .{bit});
-        try p.writeToDisk(s);
+        try p.writeToDisk(io, s);
     }
 
     // var channels = try bmp.takeChannels();

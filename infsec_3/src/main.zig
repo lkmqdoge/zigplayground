@@ -6,7 +6,7 @@ fn get_user_input(ior: *std.Io.Reader) ![] const u8{
     return s[0 .. s.len - 1];
 }
 
-fn main_menu() !void {
+fn main_menu(io: std.Io) !void {
     const MainMenuOpts = enum {
         levels,
         login,
@@ -20,7 +20,7 @@ fn main_menu() !void {
     };
 
     var buf: [1024]u8 = undefined;
-    var stdin = std.fs.File.stdin().reader(&buf);
+    var stdin = std.Io.File.stdin().reader(io, &buf);
     const ior = &stdin.interface;
 
     menu: while (true) {
@@ -63,7 +63,7 @@ fn main_menu() !void {
                         continue;
                     };
                     user_input = try ior.takeDelimiterInclusive('\n');
-                    ma.writeResource(current_user_id, res_id, user_input) catch {
+                    ma.writeResource(io, current_user_id, res_id, user_input) catch {
                         std.debug.print("Access Denied\n", .{});
                     };
                 },
@@ -74,7 +74,7 @@ fn main_menu() !void {
                         std.debug.print("Resource {s} does not exist\n", .{user_input});
                         continue;
                     };
-                    ma.readResource(current_user_id, res_id) catch {
+                    ma.readResource(io, current_user_id, res_id) catch {
                         std.debug.print("Access Denied\n", .{});
                     };
                 },
@@ -124,12 +124,9 @@ fn main_menu() !void {
 
 var ma: mac.MAC_AccessMatrix = undefined;
 
-pub fn main() !void {
-    var gpa = std.heap.DebugAllocator(.{}){};
-    defer if (gpa.deinit() == .leak) {
-        std.log.err("Memory leaked", .{});
-    };
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
     ma = .init(allocator, 0);
     defer ma.deinit();    
     try ma.addUser("Admin", .TopSecret);
@@ -144,5 +141,5 @@ pub fn main() !void {
     try ma.addResource("res_3", .Confidential);
     try ma.addResource("res_4", .TopSecret);
 
-    try main_menu();
+    try main_menu(io);
 }
