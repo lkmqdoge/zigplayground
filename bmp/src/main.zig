@@ -13,8 +13,9 @@ pub fn main(init: std.process.Init) !void {
         ++ "\n", .{});
         return;
     }
+    const filename = args[1];
 
-    var image = try bmp.BmpImage.init(io, allocator, "image.bmp");
+    var image = try bmp.BmpImage.init(io, allocator, filename);
     defer image.deinit();
     image.debugLogHeaders();
 
@@ -30,12 +31,12 @@ pub fn main(init: std.process.Init) !void {
         try p.writeToDisk(io, s);
     }
 
-    // var channels = try bmp.takeChannels();
-    // defer inline for (&channels)|*c| {
-    //     c.deinit(); 
-    // };
-    //
-    // try channels.@"0".writeToDisk("BLUE.bmp");
-    // try channels.@"2".writeToDisk("RED.bmp");
-    // try channels.@"1".writeToDisk("GREEN.bmp");
+    var channels = try image.takeChannels();
+    defer inline for (&channels)|*c| {
+        c.deinit(); 
+    };
+
+    try channels.@"0".writeToDisk(io, "BLUE.bmp");
+    try channels.@"2".writeToDisk(io, "RED.bmp");
+    try channels.@"1".writeToDisk(io, "GREEN.bmp");
 }

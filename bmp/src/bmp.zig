@@ -28,6 +28,10 @@ const BitMapInfoHeader = packed struct {
     biClrImportant: u32,
 };
 
+pub const BmpErrors = error {
+    InvalidBitCount,
+};
+
 pub const BmpImage = struct {
     fh: BitMapFileHeader,
     ih: BitMapInfoHeader,
@@ -37,7 +41,7 @@ pub const BmpImage = struct {
     pub fn init(io: std.Io,  allocator: std.mem.Allocator, path: []const u8) !BmpImage {
         const f = try std.Io.Dir.cwd().openFile(io, path, .{});
         defer f.close(io);
-        var buf: [1024]u8 = undefined;
+        var buf: [4096]u8 = undefined;
         var r = f.reader(io, &buf);
         const ior = &r.interface;
 
@@ -45,13 +49,16 @@ pub const BmpImage = struct {
         res.fh = try ior.takeStruct(BitMapFileHeader, .little);
         res.ih = try ior.takeStruct(BitMapInfoHeader, .little);
         res.allocator = allocator;
+        res.debugLogHeaders();
 
         const w: u32 = @intCast(res.ih.biWidth);
         const h: u32 = @intCast(res.ih.biHeight);
 
-        const padding = 4 - ((3 * w) % 4) % 4;
+        const padding = (4-((3*w)%4))%4;
         const num_of_pixels: usize = @intCast(w * h);
+        std.debug.print("Padding: {d}, Pixels: {d}", .{padding, num_of_pixels});
         res.data = try allocator.alloc(Pixel, num_of_pixels);
+        errdefer allocator.free(res.data);
 
         try r.seekTo(res.fh.bfOffBits);
         var idx: usize = 0;
@@ -89,7 +96,10 @@ pub const BmpImage = struct {
     }
 
     pub fn writeToDisk(self: *BmpImage, io: std.Io, path: []const u8) !void {
-        const f = try std.Io.Dir.cwd().createFile(io, path, .{});
+        var strbuf: [128]u8 = undefined;
+        const out_dir = "bmp-out";
+        const full_path = try std.fmt.bufPrint(&strbuf, "{s}/{s}", .{out_dir, path});
+        const f = try std.Io.Dir.cwd().createFile(io, full_path, .{});
         defer f.close(io);
         var buf: [1024]u8 = undefined;
         var writer = f.writer(io, &buf);
@@ -100,7 +110,7 @@ pub const BmpImage = struct {
 
         try iw.writeStruct(self.fh, .little);
         try iw.writeStruct(self.ih, .little);
-        const padding = 4 - ((3 * w) % 4) % 4;
+        const padding = (4 - (w * 3) % 4) % 4;
 
         var idx: usize = 0;
         for (0..h) |_| {
@@ -160,12 +170,16 @@ pub const BmpImage = struct {
 
     pub fn debugLogHeaders(self: *BmpImage) void {
         std.debug.print("Тип:              {x}\n", .{self.fh.bfType});
-        std.debug.print("Размер заголовка: {d} байт\n", .{self.fh.bfSize});
+        std.debug.print("Размер: {d} байт\n", .{self.fh.bfSize});
         std.debug.print("рез1:             {d}\n", .{self.fh.bfReserved1});
         std.debug.print("рез2:             {d}\n", .{self.fh.bfReserved2});
         std.debug.print("Смещение:         {d}\n", .{self.fh.bfOffBits});
+
         std.debug.print("размер:           {d}:{d}\n", .{ self.ih.biWidth, self.ih.biHeight });
         std.debug.print("размер заголовка: {d}\n", .{self.ih.biSize});
         std.debug.print("биты:             {d}\n", .{self.ih.biBitCount});
+        std.debug.print("planes:           {d}\n", .{self.ih.biPlanes});
+        std.debug.print("Цвета:            {d}\n", .{self.ih.biClrUsed});
+        std.debug.print("Цвета2:           {d}\n", .{self.ih.biClrImportant});
     }
 };
